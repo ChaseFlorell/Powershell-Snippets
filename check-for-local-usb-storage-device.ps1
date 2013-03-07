@@ -8,3 +8,5 @@ do {
 	}
 }
 while ($UsbDisk -eq $null)
+
+# After the do loop, $UsbDisk will be the name of the drive letter (example: E:)
