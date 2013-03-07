@@ -1,5 +1,5 @@
 # Pause the script and wait for the user to press a key to continue
-Function Pause($M="Press any key to continue . . . "){
+Function Pause($M="Press any key to continue... "){
 	If($psISE){
 		$S=New-Object -ComObject "WScript.Shell";$B=$S.Popup("Click OK to continue.",0,"Script Paused",0);Return
 	};
