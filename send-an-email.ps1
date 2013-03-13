@@ -1,4 +1,11 @@
-﻿Function Send-EMail {
+﻿# Requires 'base64-conversion.ps1'
+$ScriptDirectory = Split-Path $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDirectory base64-conversion.ps1)
+
+
+
+
+Function Send-EMail {
     Param (
         [Parameter(Mandatory=$true)]
         [String]$EmailTo,
@@ -26,15 +33,6 @@
         Remove-Variable -Name Password
 
 } #End Function Send-EMail
-
-function Base64-Decode($string) {
-   $bytes  = [System.Convert]::FromBase64String($string);
-   $decoded = [System.Text.Encoding]::UTF8.GetString($bytes); 
-
-   return $decoded;
-}
-
-
 
 Send-EMail -EmailFrom "me@example.com"`
            -EmailTo "me@example.com"`
