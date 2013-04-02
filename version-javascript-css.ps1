@@ -10,36 +10,77 @@
 
 #region Functions
 
-    function versionResource($fileToVersionRegex, $filePath){
-        $fileToVersion = Get-ChildItem $directoryPath\$filePath | Where-Object {$_.Name -match $fileToVersionRegex}
-        $oldFileName = $fileToVersion.Name
-        
-        $fileContent = Get-Content $directoryPath\$filePath$fileToVersion
-        $md5 = new-object -TypeName System.Security.Cryptography.MD5CryptoServiceProvider
-        $utf8 = new-object -TypeName System.Text.UTF8Encoding
-        $hash = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($fileContent)))
-        $versionHash = $hash.Replace('-', '')
-        
-        $fileToVersion -match $fileToVersionRegex > $null 
-        $newFileName = "$($matches[1])$versionHash$($matches[2])"
-        
-        if($oldFileName -ne $newFileName) {
-            Write-Host "Renaming the file"
-            Rename-Item $directoryPath\$filePath$fileToVersion -NewName $newFileName
-            
-            foreach($file in $filesContainingVersionedResourceRefs){
-                $fileContent = Get-Content $file
-                Clear-Content $file
+# Function which versions javascript and css files using the content hash.
+# NOTE: this assumes that you have two "default" versions of your combined files
+#    nameOfYourProject.css/js
+#    nameOfYourProject.min.css/js
+function versionResource($fileToVersionRegex, $filePath){
 
+    # Gets the default file name from the regex
+    $defaultFileName = $fileToVersionRegex.ToString() -replace "(\()|(\))|(\\)|(\*)", ""
+    $defaultFileName = $defaultFileName -replace "\.\.\.", "."
+
+    # Gets the content of the default file and creates a hash
+    $fileContent = Get-Content $filePath\$defaultFileName
+    $md5 = new-object -TypeName System.Security.Cryptography.MD5CryptoServiceProvider
+    $utf8 = new-object -TypeName System.Text.UTF8Encoding
+    $hash = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($fileContent)))
+    $versionHash = $hash.Replace('-', '')
+
+    # Creates a new file name based on the content hash
+    $newFileName = $defaultFileName -replace "\.min", ".$versionHash.min"
+
+    # Tries to get the old versioned file name
+    $fileToVersion = Get-ChildItem $filePath | Where-Object {$_.Name -match $fileToVersionRegex}
+    if($fileToVersion -ne $null) {
+        $oldFileName = $fileToVersion.Name
+    }
+
+    # $newFileName is still just a string at this point.
+    # If the new version name doesn't match the old version name,
+    # then we know that we need to update everything to the new version.
+    if($oldFileName -ne $newFileName) {
+
+        # OPTIONAL
+        # remove the obsolete version of the file to be versioned
+        # You may choose to NOT remove the versioned file, however
+        # since it "should" be in your version control, you can roll back if necessary
+        if($fileToVersion -ne $null) {
+            Remove-Item $filePath$oldFileName -Force -ErrorAction SilentlyContinue
+        }
+
+        # rename the default file with the new file name
+        Rename-Item -literalPath $filePath$defaultFileName -NewName $newFileName
+
+        # loop through all of the specified source files and replace with the appropriate versioned file
+        foreach($private:file in $filesContainingVersionedResourceRefs){
+            $fileContent = Get-Content $private:file
+            Clear-Content $file
+
+            if($oldFileName -ne $null){
+                # replace the old version string if it exists
                 $newFileContent = $fileContent -replace "$oldFileName","$newFileName"
-                
-                Add-Content $file $newFileContent
-                
+            } else {
+                # replace the default version string if it exists
+                $newFileContent = $fileContent -replace "$defaultFileName","$newFileName"                
             }
+
+            Add-Content $private:file $newFileContent
+
         }
     }
-    
-#endregion
 
+    # OPTIONAL: remove original files
+    # this just keeps your directory clean and free of unneeded versions of the css/js
+    $private:nonMinifiedVersion = $defaultFileName -replace ".min", ""
+    Remove-Item -LiteralPath $filePath$defaultFileName -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $filePath$private:nonMinifiedVersion -ErrorAction SilentlyContinue
+
+}
+
+# version the Javascript
 versionResource $jsFileNameRegex $jsFilePath
-versionResource $cssFileNameRegex $cssFilePath  
+
+
+# version the css
+versionResource $cssFileNameRegex $cssFilePath
